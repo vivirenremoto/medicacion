@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lista de Medicación</title>
+  <!-- jQuery & jQuery UI (para arrastrar/ordenar) -->
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jqueryui@1.11.1/jquery-ui.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a; --panel: #111827; --muted: #94a3b8; --text: #e5e7eb;
+      --accent: #22c55e; --danger: #ef4444; --card: #1f2937; --border: #334155;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial; background:#0f172a; color: var(--text); }
+    .app { max-width: 720px; margin: 40px auto; padding: 24px; }
+    .card { background: linear-gradient(180deg, #0b1220 0%, var(--card) 100%); border: 1px solid var(--border); border-radius: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.35); overflow: hidden; }
+    header { padding: 22px 22px 10px 22px; border-bottom: 1px solid var(--border); }
+    .headbar{display:flex; align-items:center; justify-content:space-between; gap:12px;}
+    h1 { font-size: 1.25rem; margin: 0; letter-spacing: .4px; }
+    p.sub { margin: 6px 0 0; color: var(--muted); font-size: .95rem; }
+
+    /* Form */
+    .controls { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 16px; border-bottom: 1px solid var(--border); }
+    input[type="text"] { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: #0b1220; color: var(--text); outline: none; font-size: 1rem; }
+    input.editName { width: 100%; padding: 8px 10px; border-radius: 10px; border: 1px dashed var(--border); background: #0b1220; color: var(--text); font-size: 1rem; }
+
+    .btn { border: 1px solid var(--border); background: #0b1220; color: var(--text); padding: 10px 14px; border-radius: 12px; cursor: pointer; font-size: 1rem; }
+    .btn:hover { filter: brightness(1.1); }
+    .btn-primary { background: linear-gradient(180deg, #1a2a1d, #0f1c12); border-color: #1f5b36; }
+    .btn-primary .dot { width: 8px; height: 8px; background: var(--accent); border-radius: 999px; display: inline-block; margin-right: 8px; }
+    .del { background: linear-gradient(180deg, #2a1717, #1b0e0e); border: 1px solid #7a2d2d; color: #fecaca; padding: 6px 10px; border-radius: 10px; cursor: pointer; }
+
+    /* List */
+    ul#medList { list-style: none; margin: 0; padding: 0; }
+    li.item { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px dashed var(--border); }
+    li.item:last-child { border-bottom: none; }
+    .drag { cursor: grab; user-select: none; font-size: 1.05rem; color: var(--muted); text-align: center; width: 24px; flex: 0 0 24px; }
+    .name { font-size: 1.05rem; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    /* Multi-turn buttons */
+    .schedule { display:flex; gap:8px; }
+    .sch-group{ display:inline-flex; gap:8px; align-items:center; }
+    .sch-btn{ display:inline-flex; align-items:center; justify-content:center; padding:8px 12px; border-radius:999px; border:1px solid var(--border); background:#0b1220; cursor:pointer; opacity:.7 }
+    .sch-btn.active{ opacity:1; outline:2px solid rgba(34,197,94,.35); }
+    .schedule .ico { font-size: 1.1rem; }
+
+    /* jQuery UI overrides */
+    .ui-sortable-placeholder { height: 48px; background: rgba(148, 163, 184, 0.12); border: 1px dashed var(--border); border-radius: 12px; visibility: visible !important; }
+    .ui-sortable-helper { box-shadow: 0 10px 18px rgba(0,0,0,.45); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="card" role="application" aria-label="Lista de medicación">
+      <header>
+        <div class="headbar">
+          <h1>💊 Lista de medicación</h1>
+          <button id="printBtn" class="btn" type="button" title="Imprimir">🖨️</button>
+        </div>
+        <p class="sub">Añade medicamentos, activa los turnos (mañana/mediodía/noche) y reordénalos arrastrando. Todo se guarda en tu navegador.</p>
+      </header>
+
+      <div class="controls">
+        <input id="medName" type="text" placeholder="Nombre del medicamento" autocomplete="off" />
+        <div class="sch-group" aria-label="Turnos">
+          <button class="btn sch-btn" data-when="mañana" type="button" title="Mañana"><span class="ico">🌅</span></button>
+          <button class="btn sch-btn" data-when="mediodía" type="button" title="Mediodía"><span class="ico">☀️</span></button>
+          <button class="btn sch-btn" data-when="noche" type="button" title="Noche"><span class="ico">🌙</span></button>
+        </div>
+        <button id="addBtn" class="btn btn-primary" type="button"><span class="dot"></span> Añadir</button>
+      </div>
+
+      <ul id="medList" aria-label="Lista reordenable de medicación"></ul>
+    </div>
+  </div>
+
+  <script>
+    (function(){
+      const STORAGE_KEY='medsList:v2';
+      const SCHEDULES=['mañana','mediodía','noche'];
+      const ICON={ 'mañana':'🌅','mediodía':'☀️','noche':'🌙' };
+
+      let state=load()||[];
+      // Migración: si hay items antiguos con 'schedule' string -> objeto 'schedules'
+      state=state.map(it=>{
+        if(it && typeof it.schedule==='string' && !it.schedules){
+          const obj={'mañana':false,'mediodía':false,'noche':false};
+          if(SCHEDULES.includes(it.schedule)) obj[it.schedule]=true;
+          return { id: it.id || uid(), name: it.name || '', schedules: obj };
+        }
+        if(!it.schedules) it.schedules={'mañana':false,'mediodía':false,'noche':false};
+        return it;
+      });
+      save();
+
+      // Selección del formulario (multi-toggle)
+      let formSelected={'mañana':false,'mediodía':false,'noche':false};
+
+      function uid(){return 'm_'+Math.random().toString(36).slice(2,10)}
+      function save(){localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}
+      function load(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]')}catch{return []}}
+      function escapeHtml(str){return str.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[m]))}
+      function cap(s){return s.charAt(0).toUpperCase()+s.slice(1)}
+
+      function render(){
+        const $list=$('#medList').empty();
+        if(!state.length){
+          $list.append(`<li class="item" aria-hidden="true" style="opacity:.7">
+            <div class="drag" title="Arrastra">︙</div>
+            <div class="name">(vacío) Añade tu primer medicamento</div>
+            <div class="schedule">
+              <button class="btn sch-btn" disabled><span class="ico">🌅</span></button>
+              <button class="btn sch-btn" disabled><span class="ico">☀️</span></button>
+              <button class="btn sch-btn" disabled><span class="ico">🌙</span></button>
+            </div>
+          </li>`);
+          return;
+        }
+        for(const item of state){
+          const $li=$(`<li class="item" data-id="${item.id}"></li>`);
+          $li.append(`<div class="drag" title="Arrastra para reordenar">︙</div>`);
+          $li.append(`<div class="name">${escapeHtml(item.name)}</div>`);
+          const btns=SCHEDULES.map(when=>{
+            const active=item.schedules && item.schedules[when];
+            const cls='btn sch-btn'+(active?' active':'');
+            return `<button class="${cls}" data-when="${when}" type="button" title="${cap(when)}"><span class="ico">${ICON[when]}</span></button>`;
+          }).join('');
+          $li.append(`<div class="schedule">${btns}</div>`);
+          $li.append(`<button class="del" type="button" title="Eliminar">✕</button>`);
+          $list.append($li);
+        }
+      }
+
+      function addItem(){
+        const name=$('#medName').val().trim();
+        if(!name){ $('#medName').focus(); return; }
+        // si no se marcó nada en el formulario, por defecto 'mañana'
+        const anySel=Object.values(formSelected).some(Boolean);
+        const schedules= anySel ? {...formSelected} : {'mañana':true,'mediodía':false,'noche':false};
+        state.push({ id: uid(), name, schedules });
+        save();
+        $('#medName').val('');
+        render();
+      }
+
+      // Eventos formulario
+      $('#addBtn').on('click',addItem);
+      $('#medName').on('keypress',e=>{ if(e.which===13){ e.preventDefault(); addItem(); }});
+      $('.controls').on('click','.sch-btn',function(){
+        const when=$(this).data('when');
+        formSelected[when]=!formSelected[when];
+        $(this).toggleClass('active',formSelected[when]);
+      });
+
+      // Eventos lista
+      $('#medList').on('click','.schedule .sch-btn',function(){
+        const id=$(this).closest('li').data('id');
+        const when=$(this).data('when');
+        const item=state.find(x=>x.id===id);
+        if(!item) return;
+        if(!item.schedules) item.schedules={'mañana':false,'mediodía':false,'noche':false};
+        item.schedules[when]=!item.schedules[when];
+        $(this).toggleClass('active', item.schedules[when]);
+        save();
+      });
+
+      $('#medList').on('click','.del',function(){
+        const id=$(this).closest('li').data('id');
+        const item=state.find(x=>x.id===id);
+        if(!item) return;
+        const ok=confirm(`¿Seguro que quieres eliminar "${item.name}"?`);
+        if(ok){
+          state=state.filter(x=>x.id!==id);
+          save(); render();
+        }
+      });
+
+      // Editar nombre inline
+      $('#medList').on('click','.name',function(){
+        const $li=$(this).closest('li');
+        const id=$li.data('id');
+        const item=state.find(x=>x.id===id);
+        if(!item) return;
+        const $input=$('<input class="editName" type="text"/>').val(item.name);
+        $(this).replaceWith($input);
+        $input.focus().select();
+        function commit(saveChange){ if(saveChange){ const v=$input.val().trim(); if(v) item.name=v; save(); } render(); }
+        $input.on('keydown',e=>{ if(e.key==='Enter') commit(true); else if(e.key==='Escape') commit(false); });
+        $input.on('blur',()=>commit(true));
+      });
+
+      // Imprimir: solo iconos de turnos activos
+      $('#printBtn').on('click',function(){
+        const rows=state.map(it=>{
+          const icons=SCHEDULES.filter(w=>it.schedules && it.schedules[w]).map(w=>ICON[w]).join(' ');
+          return `<div class=\"row\"><div class=\"when\">${icons}</div><div class=\"nm\">${escapeHtml(it.name)}</div></div>`;
+        }).join('') || '<div class="empty">(sin elementos)</div>';
+
+        const html = `<!doctype html>
+<html lang="es"><head><meta charset="utf-8" />
+<title>horario medicamentos</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;margin:32px;color:#000;background:#fff}
+h1{margin:0 0 28px;font-size:42px;letter-spacing:.5px;text-transform:lowercase}
+.row{display:flex;align-items:center;gap:18px;padding:12px 0;border-bottom:1px solid #000}
+.row:last-child{border-bottom:none}
+.when{font-size:34px;min-width:160px;text-align:center}
+.nm{font-size:30px;flex:1}
+.empty{color:#000;font-style:italic}
+@media print{ body{margin:16mm} }
+</style></head>
+<body>
+  <h1>horario medicamentos</h1>
+  ${rows}
+  <script>window.onload=function(){window.print()}<\/script>
+</body></html>`;
+        const w=window.open('','_blank'); if(!w){ alert('Bloqueada la ventana de impresión.'); return; }
+        w.document.open(); w.document.write(html); w.document.close();
+      });
+
+      // Sortable
+      $('#medList').sortable({ handle:'.drag', placeholder:'ui-sortable-placeholder', update:function(){
+        const ids=$('#medList>li').map(function(){return $(this).data('id')}).get();
+        state.sort((a,b)=>ids.indexOf(a.id)-ids.indexOf(b.id)); save();
+      }});
+
+      render();
+    })();
+  </script>
+</body>
+</html>
